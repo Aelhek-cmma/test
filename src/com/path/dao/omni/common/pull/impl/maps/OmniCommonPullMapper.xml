@@ -1,0 +1,1220 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE mapper PUBLIC "-//ibatis.apache.org//DTD Mapper 3.0//EN"
+        "http://ibatis.apache.org/dtd/ibatis-3-mapper.dtd">
+<mapper namespace="omniCommonPullMapper">
+
+	<resultMap id="appChnlMap"
+		type="com.path.dbmaps.vo.OC_APP_CHNLVO">
+		<result property="STATUS" column="STATUS" />
+	</resultMap>
+
+	<select id="returnAppChnlVO" parameterType="omniBaseSC"
+		resultMap="appChnlMap">
+		SELECT OPC.*
+		FROM oc_app_chnl OPC
+		WHERE OPC.APP_ID =
+		#{appId,jdbcType=NUMERIC}
+		AND OPC.CHNL_ID =
+		#{channelId,jdbcType=NUMERIC}
+		AND OPC.COMP_CODE =
+		#{compCode,jdbcType=NUMERIC}
+	</select>
+
+
+	<resultMap id="simMap" type="com.path.dbmaps.vo.SimVO">
+		<result property="sim_serial" column="sim_serial" />
+	</resultMap>
+
+	<select id="returnSimVO"
+		parameterType="com.path.dbmaps.vo.ClientCO" resultMap="simMap">
+		SELECT *
+		FROM sim
+		WHERE mobile_number =
+		#{mobile_number,jdbcType=VARCHAR}
+
+	</select>
+
+	<select id="returnSimSerial"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.SimVO">
+		SELECT sim_id FROM sim WHERE
+		sim_serial=#{sim_serial,jdbcType=NUMERIC}
+	</select>
+
+
+	<resultMap id="deviceMap" type="com.path.dbmaps.vo.DeviceVO">
+		<result property="device_UUID" column="device_UUID" />
+	</resultMap>
+
+	<select id="returnDevice"
+		parameterType="com.path.dbmaps.vo.ClientCO" resultMap="deviceMap">
+		SELECT *
+		FROM
+		device
+		WHERE device_UUID =
+		#{device_UUID,jdbcType=NUMERIC}
+
+
+	</select>
+
+
+	<select id="returnCombinationUsernameDevice"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.Client_deviceVO">
+		SELECT * FROM client_device csd WHERE 
+		csd.client_id =  
+		#{client_id,jdbcType=NUMERIC}
+		AND
+		csd.device_id = (SELECT
+		device_id
+		FROM
+		device where device_UUID =
+		#{device_UUID,jdbcType=NUMERIC})
+	</select>
+
+	<select id="returnUsernameExists"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="java.lang.Integer">
+		select exists (select client_id from client where username= #{username,jdbcType=NUMERIC} )
+	</select>
+
+	<select id="returnCombination"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.Client_deviceVO">
+		SELECT client_id , client_status FROM client_device csd WHERE 
+		csd.device_id = (SELECT
+		device_id
+		FROM
+		device where device_UUID =
+		#{device_UUID,jdbcType=NUMERIC})
+		and csd.client_id = 
+		(SELECT client_id from client where 
+		username = #{username,jdbcType=VARCHAR})
+		
+	</select>
+
+	<select id="returnUsernamePassword"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.ClientVO">
+		SELECT client_id ,password , salt FROM client WHERE username=
+		#{username,jdbcType=VARCHAR}
+	</select>
+
+
+	<select id="returnUsername"
+		parameterType="com.path.dbmaps.vo.ClientVO"
+		resultType="com.path.dbmaps.vo.ClientVO">
+		SELECT client_id FROM client WHERE username=
+		#{username,jdbcType=VARCHAR}
+	</select>
+
+	<select id="returnListOfMachine"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultType="com.path.dbmaps.vo.MachineVO">
+
+		SELECT m.MACHINE_ID,m.LATITUDE, m.LONGITUDE, ((ACOS(SIN(
+		#{location.latitude,jdbcType=NUMERIC}
+		*
+		PI() / 180) *
+		SIN(r.LATITUDE_TO *
+		PI() / 180) +
+		COS(#{location.latitude,jdbcType=NUMERIC}* PI() / 180) *
+		COS(r.LATITUDE_TO *
+		PI() / 180) *
+		COS((#{location.longitude,jdbcType=NUMERIC} - r.LONGITUDE_TO) *
+		PI() /
+		180)) * 180 / PI()) * 60 * 1.1515 * 1.609344)
+		as distance FROM
+		machine
+		m, reservation r
+		where m.MACHINE_ID= r.RESERVATION_MACHINE_ID
+		and
+		r.DATE=#{date,jdbcType=VARCHAR}
+		ORDER BY distance ASC
+	</select>
+	
+	
+	<resultMap id="returnListAvailableMachinesNearestMostFarMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result property="machine_driver_id" column="machine_driver_id" />
+		<result property="machine_id" column="machine_id" />
+		<result property="driver_id" column="driver_id" />
+		<result property="machine_plate_number" column="plate_number" />
+		<result property="driver_mobile_number" column="mobile_number" />
+		<result property="driver_name" column="name" />
+		<result property="pic" column="pic" />
+		<result property="timeToReachClient" column="timeToReachClient" />
+		<result property="timeInSec" column="timeInSec" />
+	</resultMap>
+
+	<select id="returnListAvailableMachinesNearestMostFar" 
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="returnListAvailableMachinesNearestMostFarMap">
+		SELECT md.machine_driver_id ,d.driver_id, d.name , d.mobile_number,m.plate_number, d.pic,
+		time_format( (SEC_TO_TIME(((ST_Distance_Sphere(
+		point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+	    point(md.longitude, md.latitude)
+		) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) ,"%H:%i:00" ) as timeToReachClient,
+			(((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+					    point(md.longitude, md.latitude)
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)  as timeInSec 
+		 FROM
+		machine_driver 
+		md , machine m , driver d 
+		where md.machine_driver_status = 0  
+        and md.machine_id = m.machine_id and
+		md.driver_id = d.driver_id
+		and machine_driver_status = 0
+		and md.machine_driver_id not in 
+		(select machine_driver_id from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+		and time > #{time,jdbcType=TIMESTAMP} and time <![CDATA[ <= ]]> addtime(#{time,jdbcType=TIMESTAMP},'00:30:00')
+		or (time <![CDATA[ <= ]]> #{time,jdbcType=TIMESTAMP} and time_slot > addtime(#{time,jdbcType=TIMESTAMP},'00:05:00') ))
+       
+        
+		</select>
+	
+	<resultMap id="returnListUnAvailableMachinesNearestMostFarMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result property="machine_driver_id" column="machine_driver_id" />
+		<result property="machine_id" column="machine_id" />
+		<result property="driver_id" column="driver_id" />
+		<result property="machine_plate_number" column="plate_number" />
+		<result property="driver_mobile_number" column="mobile_number" />
+		<result property="driver_name" column="name" />
+		<result property="pic" column="pic" />
+		<result property="timeToReachClient" column="timeToReachClient" />
+		<result property="timeInSec" column="timeInSec" />
+	</resultMap>
+
+	<select id="returnListUnavailableMachines" 
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="returnListUnAvailableMachinesNearestMostFarMap">
+		select md.machine_driver_id,d.name , d.pic,d.mobile_number , time_format( addtime ((subtime(rl.time_slot,#{time,jdbcType=TIMESTAMP})),
+						(SEC_TO_TIME(((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to)
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))),"%H:%i:00") as timeToReachClient ,
+						(((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to)
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)  as timeInSec 
+		from machine_driver md , reservation r , reservation_list rl , driver d 
+		where md.machine_driver_status = 1
+		and md.driver_id = d.driver_id 
+		and r.reservation_id = rl.reservation_id 
+		and md.machine_driver_id = rl.machine_driver_id
+		and rl.date = #{date,jdbcType=TIMESTAMP} and rl.time_slot> #{time,jdbcType=TIMESTAMP}
+		and
+		md.machine_driver_id not in 
+		(select machine_driver_id from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+		and time > #{time,jdbcType=TIMESTAMP} and time <![CDATA[ <= ]]> addtime(#{time,jdbcType=TIMESTAMP},'00:30:00')
+		or (time <![CDATA[ <= ]]> #{time,jdbcType=TIMESTAMP} and time_slot > addtime(#{time,jdbcType=TIMESTAMP},'00:05:00') ))
+        
+		</select>
+	
+	
+	<resultMap id="NearestAvailableMachineMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result property="machine_model"	column="model" />
+		<result property="machine_plate_number" column="plate_number" />
+		<result property="driver_mobile_number" column="mobile_number" />
+		<result property="driver_name" column="name" />
+		<result property="distance" column="distance" />
+		<result property="timeToReachClient" column="timeToReachClient" />
+		<result property="timeOfTrip" column="timeOfTrip" />
+		<result property="timeInSec" column="timeInSec" />
+	</resultMap>
+
+	<select id="returnNearestAvailableMachine"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="NearestAvailableMachineMap">
+		SELECT md.* ,d.*,m.*, (ST_Distance_Sphere(
+		point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+	    point(md.longitude, md.latitude)
+		) /1000 ) 
+		as distance ,
+		
+		time_format( (SEC_TO_TIME(((ST_Distance_Sphere(
+		point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+	    point(md.longitude, md.latitude)
+		) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) ,"%H:%i:00" ) as timeToReachClient ,
+		 (((ST_Distance_Sphere(
+		point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+	    point(md.longitude, md.latitude)
+		) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)  as timeInSec ,
+		time_format( (SEC_TO_TIME(((ST_Distance_Sphere(
+		point(#{longitude_from,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}),
+	    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC})
+		) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)),"%H:%i:00" ) as timeOfTrip
+		 FROM
+		machine_driver 
+		md , machine m , driver d 
+		where md.machine_driver_status =0  
+        and md.machine_id = m.machine_id and
+		 md.driver_id = d.driver_id
+		ORDER BY timeToReachClient ASC
+        limit 1
+		</select>
+
+	<resultMap id="NearestUnavailableMachineTypeTripMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result property="machine_model"	column="model" />
+		<result property="machine_plate_number" column="plate_number" />
+		<result property="driver_mobile_number" column="mobile_number" />
+		<result property="driver_name" column="name" />
+		<result property="timeToReachClient" column="timeToReachClient"/>
+		<result property="distance" column="distance"/>
+		<result property="timeOfTrip" column="timeOfTrip"/>
+		
+	</resultMap>
+
+	<select id="returnNearestUnavailableMachineTypeTrip"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="NearestUnavailableMachineTypeTripMap">
+			select m.machine_id , d.driver_id , md.machine_driver_id, m.plate_number, m.model, d.name, d.mobile_number , d.pic ,
+						
+						(ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC})))/1000  as distance,
+					    
+						time_format( addtime ((subtime(rl.time_slot,#{time,jdbcType=TIMESTAMP})),
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))),"%H:%i:00") as timeToReachClient ,
+						
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) as timeFromDestinationToClient ,
+						
+						time_format( (SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)),"%H:%i:00" ) as timeOfTrip
+				  
+				from machine_driver md , reservation_list rl , reservation r ,machine m , driver d where 
+				rl.machine_driver_id = md.machine_driver_id
+				and rl.reservation_id = r.reservation_id and 
+				md.machine_id=m.machine_id and md.driver_id = d.driver_id
+				and machine_driver_status = 1 and rl.date  = #{date,jdbcType=TIMESTAMP}
+				and rl.time_slot >= #{time,jdbcType=TIMESTAMP} and
+				(rl.time_slot <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP}))
+				
+				and md.machine_driver_id not in (
+					select rl.machine_driver_id  from reservation_list rl ,  reservation r  where rl.reservation_id = r.reservation_id 
+					 and rl.date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (rl.time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and rl.time_slot<![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+						)
+				       or 
+				            ( rl.time >= (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+						            and rl.time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                       			 and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / 50)*60*60)) )))
+				         )
+				         
+				         	or 
+				         	(rl.time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+								and rl.time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+						or
+					        (rl.time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+					            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+									and rl.time_slot >addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) ))) 
+							)
+				    )
+				)
+				and md.machine_driver_id not in (
+					select machine_driver_id  from temporary_reservation where   date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    
+				    
+				    (time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and time_slot <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				    and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+				    addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to,latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						)
+						)
+						)
+				     or 
+				         ( time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							and time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+					        and time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+					        and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)),
+							(SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						    point(longitude_to, latitude_to))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							))
+					 )
+					 or 
+						 (time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+								 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+								and time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+					 or
+				        (time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and time_slot > addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+						)
+				 )
+				)
+				order by  timeToReachClient
+<!-- 				limit 1 -->
+	</select>
+	
+	
+	
+
+	<resultMap id="NearestUnavailableMachineTypeMachineMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+			<result property="machine_model"	column="model" />
+			<result property="machine_plate_number" column="plate_number" />
+			<result property="driver_mobile_number" column="mobile_number" />
+			<result property="driver_name" column="name" />
+			<result property="timeToReachClient" column="timeToReachClient"/>
+			<result property="distance" column="distance"/>
+			<result property="timeOfTrip" column="timeOfTrip"/>
+	</resultMap>
+	<select id="returnNearestUnavailableMachineTypeMachine"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="NearestUnavailableMachineTypeMachineMap">
+			select m.machine_id , d.driver_id , md.machine_driver_id, m.plate_number, m.model, d.name, d.mobile_number , d.pic ,
+						
+						(ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC})))/1000  as distance,
+					    
+						time_format( addtime ((subtime(rl.time_slot,#{time,jdbcType=TIMESTAMP})),(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))),"%H:%i:00") as timeToReachClient ,
+						
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) as timeFromDestinationToClient ,
+						
+						#{time_slot,jdbcType=NUMERIC} as timeOfTrip
+				  
+				from machine_driver md , reservation_list rl , reservation r ,machine m , driver d where 
+				rl.machine_driver_id = md.machine_driver_id
+				and rl.reservation_id = r.reservation_id and 
+				md.machine_id=m.machine_id and md.driver_id = d.driver_id
+				and machine_driver_status = 1 and rl.date  = #{date,jdbcType=TIMESTAMP}
+				and rl.time_slot >= #{time,jdbcType=TIMESTAMP} and
+				(rl.time_slot <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				 and time_slot >= #{time,jdbcType=TIMESTAMP}))
+				
+				and md.machine_driver_id not in (
+					select rl.machine_driver_id  from reservation_list rl ,  reservation r  where rl.reservation_id = r.reservation_id 
+					 and rl.date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (rl.time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and rl.time_slot<![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        		 (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+						)
+						or (rl.time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        		 (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+								and rl.time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+							
+				       or 
+				            ( rl.time >= (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                               		 (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+						            and rl.time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                       			 and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                       			  (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+				             )
+				        or
+				        (rl.time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and rl.time_slot >addtime((select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+								 (addtime(#{time_slot,jdbcType=TIMESTAMP}, sec_to_time((((ST_Distance_Sphere(
+							point(#{longitude_to,jdbcType=NUMERIC},#{latitude_to,jdbcType=NUMERIC}),
+						    point(r.longitude_from, r.latitude_from))
+							)/1000 )/#{velocity,jdbcType=NUMERIC})*60*60)
+							)) ) 
+						)     
+				    )
+				)
+				and md.machine_driver_id not in (
+					select machine_driver_id  from temporary_reservation where   date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and time_slot <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				    and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+				    addtime(#{time_slot,jdbcType=NUMERIC}, 
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to,latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						)
+						)
+						)
+				     or 
+			            ( time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+				              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime(#{time_slot,jdbcType=NUMERIC}, 
+							(SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						    point(longitude_to, latitude_to))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+								))
+				        and time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				        and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime(#{time_slot,jdbcType=NUMERIC},
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to, latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						))
+					 )
+					 or 
+						 (time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+								 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                      		   and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        	   (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+								and time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+					 or
+				        (time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and time_slot >addtime((select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+								 (addtime(#{time_slot,jdbcType=TIMESTAMP}, sec_to_time((((ST_Distance_Sphere(
+							point(#{longitude_to,jdbcType=NUMERIC},#{latitude_to,jdbcType=NUMERIC}),
+						    point(r.longitude_from, r.latitude_from))
+							)/1000 )/#{velocity,jdbcType=NUMERIC})*60*60)
+							)) ) 
+						)		
+				 )
+				)
+				order by  timeToReachClient
+				limit 1
+
+	</select>
+
+	
+	
+	<resultMap id="ListOfMachinesFromNearestToMostFarTripMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+			<result property="machine_model"	column="model" />
+			<result property="machine_plate_number" column="plate_number" />
+			<result property="driver_mobile_number" column="mobile_number" />
+			<result property="driver_name" column="name" />
+			<result property="timeToReachClient" column="timeToReachClient"/>
+			<result property="distance" column="distance"/>
+			<result property="timeOfTrip" column="timeOfTrip"/>
+	</resultMap>
+	<select id="returnListOfMachinesFromNearestToMostFarTrip"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="ListOfMachinesFromNearestToMostFarTripMap">
+	
+			select m.machine_id , m.model, m.plate_number , d.driver_id , d.name , d.mobile_number , md.machine_driver_id,
+						
+						(ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC})))/1000  as distance,
+					    
+						time_format( addtime ((subtime(rl.time_slot,#{time,jdbcType=TIMESTAMP})),(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))),"%H:%i:00") as timeToReachClient ,
+						
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) as timeFromDestinationToClient ,
+						
+						time_format( (SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)),"%H:%i:00" ) as timeOfTrip
+				  
+				from machine_driver md , reservation_list rl , reservation r ,machine m , driver d where 
+				rl.machine_driver_id = md.machine_driver_id
+				and rl.reservation_id = r.reservation_id and 
+				md.machine_id=m.machine_id and md.driver_id = d.driver_id
+				and machine_driver_status = 1 and rl.date  = #{date,jdbcType=TIMESTAMP}
+				and rl.time_slot >= #{time,jdbcType=TIMESTAMP} and
+				(rl.time_slot <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP}))
+				
+				and md.machine_driver_id not in (
+					select rl.machine_driver_id  from reservation_list rl ,  reservation r  where rl.reservation_id = r.reservation_id 
+					 and rl.date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (rl.time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and rl.time_slot<![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+						)
+				       or 
+				            ( rl.time >= (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+						            and rl.time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                       			 and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / 50)*60*60)) )))
+				         )
+				         
+				         	or 
+				         	(rl.time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+								and rl.time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+						or
+					        (rl.time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+					            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+									and rl.time_slot >addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+									point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+									) /1000 ) / 50)*60*60)) , (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) ))) 
+							)
+				    )
+				)
+				and md.machine_driver_id not in (
+					select machine_driver_id  from temporary_reservation where   date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    
+				    
+				    (time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and time_slot <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				    and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+				    addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to,latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						)
+						)
+						)
+				     or 
+				         ( time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							and time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+					        and time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+					        and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)),
+							(SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						    point(longitude_to, latitude_to))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							))
+					 )
+					 or 
+						 (time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+								 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+								and time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+					 or
+				        (time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and time_slot > addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+					              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime((SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC}))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)), 
+								(SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+									))
+						)
+				 )
+				)
+				order by  timeToReachClient
+	</select>
+	
+	
+	<resultMap id="listOfMachinesFromNearestToMostFarMachineMap"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result property="machine_model"	column="model" />
+		<result property="machine_plate_number" column="plate_number" />
+		<result property="driver_mobile_number" column="mobile_number" />
+		<result property="driver_name" column="name" />
+		<result property="timeToReachClient" column="timeToReachClient"/>
+		<result property="distance" column="distance"/>
+		<result property="timeOfTrip" column="timeOfTrip"/>
+		
+	</resultMap>
+
+	<select id="returnListOfMachinesFromNearestToMostFarMachine"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="listOfMachinesFromNearestToMostFarMachineMap">
+			select m.machine_id , d.driver_id , md.machine_driver_id, m.plate_number, m.model, d.name, d.mobile_number , d.pic ,
+						
+						(ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_to,jdbcType=NUMERIC})))/1000  as distance,
+					    
+						time_format( addtime ((subtime(rl.time_slot,#{time,jdbcType=TIMESTAMP})),(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))),"%H:%i:00") as timeToReachClient ,
+						
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(r.longitude_to, r.latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) as timeFromDestinationToClient ,
+						
+						#{time_slot,jdbcType=NUMERIC} as timeOfTrip
+				  
+				from machine_driver md , reservation_list rl , reservation r ,machine m , driver d where 
+				rl.machine_driver_id = md.machine_driver_id
+				and rl.reservation_id = r.reservation_id and 
+				md.machine_id=m.machine_id and md.driver_id = d.driver_id
+				and rl.date  = #{date,jdbcType=TIMESTAMP}
+				and rl.time_slot >= #{time,jdbcType=TIMESTAMP} and
+				(rl.time_slot <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				 and time_slot >= #{time,jdbcType=TIMESTAMP}))
+				
+				and md.machine_driver_id not in (
+					select rl.machine_driver_id  from reservation_list rl ,  reservation r  where rl.reservation_id = r.reservation_id 
+					 and rl.date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (rl.time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and rl.time_slot<![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        		 (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+						)
+						or (rl.time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                        and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        		 (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+								and rl.time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+							
+				       or 
+				            ( rl.time >= (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+										and rl.time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}  
+                               and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                               		 (SEC_TO_TIME((((ST_Distance_Sphere(
+									point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+								    point(r.longitude_to, r.latitude_to))
+									) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+						            and rl.time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                       			 and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                       			  (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(r.longitude_to, r.latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60)) )))
+				             )
+				        or
+				        (rl.time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and rl.time_slot >addtime((select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+								 (addtime(#{time_slot,jdbcType=TIMESTAMP}, sec_to_time((((ST_Distance_Sphere(
+							point(#{longitude_to,jdbcType=NUMERIC},#{latitude_to,jdbcType=NUMERIC}),
+						    point(r.longitude_from, r.latitude_from))
+							)/1000 )/#{velocity,jdbcType=NUMERIC})*60*60)
+							)) ) 
+						)     
+				    )
+				)
+				and md.machine_driver_id not in (
+					select machine_driver_id  from temporary_reservation where   date = #{date,jdbcType=TIMESTAMP} and 
+				    (
+				    (time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} )
+				    and time_slot <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				    and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+				    addtime(#{time_slot,jdbcType=NUMERIC}, 
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to,latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						)
+						)
+						)
+				     or 
+			            ( time >= (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time <![CDATA[ <= ]]> addtime((select min(time_slot) from reservation_list where date = #{date,jdbcType=TIMESTAMP}
+				              and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime(#{time_slot,jdbcType=NUMERIC}, 
+							(SEC_TO_TIME((((ST_Distance_Sphere(
+							point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+						    point(longitude_to, latitude_to))
+							) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+								))
+				        and time_slot>=addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+				        and time_slot >= #{time,jdbcType=TIMESTAMP} ),addtime(#{time_slot,jdbcType=NUMERIC},
+						(SEC_TO_TIME((((ST_Distance_Sphere(
+						point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+					    point(longitude_to, latitude_to))
+						) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+						))
+					 )
+					 or 
+						 (time <![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+								 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+						and time_slot <![CDATA[ <= ]]>	addtime((select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP} 
+                      		   and time_slot >= #{time,jdbcType=TIMESTAMP} ),(addtime(#{time_slot,jdbcType=NUMERIC} ,
+                        	   (SEC_TO_TIME((((ST_Distance_Sphere(
+								point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+							    point(longitude_to, latitude_to))
+								) /1000 ) / #{velocity,jdbcType=NUMERIC})*60*60))
+							 )))
+								and time_slot> (select min(time_slot) from reservation_list where date  = #{date,jdbcType=TIMESTAMP}
+									 and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+							)
+					 or
+				        (time<![CDATA[ <= ]]> (select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ) 
+								and time_slot >addtime((select min(time_slot) from reservation_list where date  =#{date,jdbcType=TIMESTAMP} 
+				            and time_slot >= #{time,jdbcType=TIMESTAMP} ),
+								 (addtime(#{time_slot,jdbcType=TIMESTAMP}, sec_to_time((((ST_Distance_Sphere(
+							point(#{longitude_to,jdbcType=NUMERIC},#{latitude_to,jdbcType=NUMERIC}),
+						    point(r.longitude_from, r.latitude_from))
+							)/1000 )/#{velocity,jdbcType=NUMERIC})*60*60)
+							)) ) 
+						)		
+				 )
+				)
+				order by  timeToReachClient
+				
+
+	</select>
+	
+	<select id="returnDistance"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultType="com.path.dbmaps.vo.ReservationCO">
+		SELECT (ST_Distance_Sphere(
+					point(#{longitude_from,jdbcType=NUMERIC},#{latitude_from,jdbcType=NUMERIC}),
+		  		 	point(#{longitude_to,jdbcType=NUMERIC}, #{latitude_from,jdbcType=NUMERIC}))
+					) as distance
+	</select>
+	
+	<resultMap id="returnMachineDriverDetails"
+		type="com.path.dbmaps.vo.Machine_driverCO">
+		<result column="model" property="machine_model" />
+		<result column="plate_number" property="machine_plate_number" />
+		<result column="name" property="driver_name" />
+		<result column="mobile_number" property="driver_mobile_number" />
+		<result column="pic" property="pic" />
+		
+	</resultMap>
+
+	<select id="returnMachineDriverDetails"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultMap="returnMachineDriverDetails">
+		SELECT m.* , d.* from machine m , driver d WHERE
+		m.machine_id =(SELECT
+		machine_id FROM machine_driver where
+		machine_driver_id = (SELECT
+		machine_driver_id FROM reservation_list
+		WHERE
+		reservation_id =
+		(SELECT
+		reservation_id FROM reservation where
+		client_id =
+		#{client_id,jdbcType=NUMERIC} and
+		date=#{date,jdbcType=TIMESTAMP} and
+		time=#{time,jdbcType=TIMESTAMP})))
+		and d.driver_id = (SELECT driver_id
+		FROM
+		machine_driver WHERE
+		machine_driver_id = (SELECT machine_driver_id
+		FROM
+		reservation_list
+		WHERE reservation_id =
+		(SELECT reservation_id FROM
+		reservation WHERE
+		client_id = #{client_id,jdbcType=NUMERIC} and
+		date=#{date,jdbcType=TIMESTAMP} and
+		time=#{time,jdbcType=TIMESTAMP})))
+	</select>
+
+
+	<select id="returnDriver"
+		parameterType="com.path.dbmaps.vo.DriverVO"
+		resultType="com.path.dbmaps.vo.DriverVO">
+		SELECT * FROM driver WHERE mobile_number =
+		#{mobile_number,jdbcType=VARCHAR} and date_of_birth = #{mobile_number,jdbcType=VARCHAR}
+	</select>
+
+	<select id="returnDriverInfos"
+		parameterType="com.path.dbmaps.vo.DriverVO"
+		resultType="com.path.dbmaps.vo.DriverVO">
+		SELECT d.* , md.machine_id FROM driver d, machine_driver md WHERE
+		d.driver_id = md.driver_id and 
+		 d.driver_id =
+		#{driver_id,jdbcType=NUMERIC}
+	</select>
+	
+	<select id="returnClientInfos"
+		parameterType="com.path.dbmaps.vo.ClientVO"
+		resultType="com.path.dbmaps.vo.ClientVO">
+		SELECT name ,profile FROM client WHERE
+		 client_id =
+		#{client_id,jdbcType=NUMERIC}
+		
+	</select>
+	
+	<select id="returnMachineInfos"
+		parameterType="com.path.dbmaps.vo.MachineVO"
+		resultType="com.path.dbmaps.vo.MachineVO">
+		SELECT m.* , md.driver_id FROM machine m , machine_driver md WHERE
+		m.machine_id = md.machine_id and 
+		 m.machine_id =
+		#{machine_id,jdbcType=NUMERIC}
+	</select>
+
+	<select id="returnUsernamePasswordById"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.ClientVO">
+		SELECT *  from client WHERE
+		client_id =#{client_id,jdbcType=NUMERIC}
+	</select>
+
+	<select id="returnMachineByPlateNumber"
+		parameterType="com.path.dbmaps.vo.MachineVO"
+		resultType="com.path.dbmaps.vo.MachineVO">
+		SELECT machine_id FROM machine WHERE
+		plate_number
+		=#{plate_number,jdbcType=NUMERIC}
+	</select>
+
+	
+
+
+	<resultMap id="returnReservationsListMap"
+		type="com.path.dbmaps.vo.ReservationSC">
+		<result column="reservation_id" property="reservation_id" />
+		<result column="reservation_list_id" property="reservation_list_id" />
+		<result column="plate_number" property="machine_plate_number" />
+		<result column="name" property="driver_name" />
+		<result column="mobile_number" property="driver_mobile_number" />
+		<result column="pic" property="pic" />
+		
+	</resultMap>
+
+	<select id="returnReservationsList"
+		parameterType="com.path.dbmaps.vo.ReservationVO"
+		resultMap="returnReservationsListMap">
+		SELECT r.reservation_id , rl.reservation_list_id , d.name , d.mobile_number , d.pic , m.plate_number
+ 		FROM reservation r , reservation_list rl , machine_driver md , driver d , machine m 
+		WHERE client_id =#{client_id,jdbcType=NUMERIC} and 
+        r.reservation_id = rl.reservation_id 
+        and rl.machine_driver_id = md.machine_driver_id
+        and md.driver_id = d.driver_id 
+        and md.machine_id = m.machine_id 
+		<if test="date != null ">
+			and date=#{date,jdbcType=TIMESTAMP}
+		</if>
+		<if test="time != null ">
+			and time =
+			#{time,jdbcType=TIMESTAMP}
+		</if>
+	</select>
+
+
+	<select id="returnMaxTemporaryReservation"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultType="com.path.dbmaps.vo.TemporaryReservationVO">
+		SELECT distinct temp_reservation_id FROM
+		temporary_reservation WHERE
+		temp_reservation_id = (SELECT
+		max(temp_reservation_id) FROM
+		temporary_reservation)
+	</select>
+
+	<select id="returnListOfTmeporaryReservation"
+		parameterType="com.path.dbmaps.vo.TemporaryReservationVO"
+		resultType="com.path.dbmaps.vo.TemporaryReservationVO">
+		SELECT * FROM temporary_reservation WHERE
+		temp_reservation_id =
+		#{temp_reservation_id,jdbcType=NUMERIC}
+	</select>
+
+	<select id="returnReservationOccurrenceType"
+		parameterType="com.path.dbmaps.vo.ReservationVO"
+		resultType="com.path.dbmaps.vo.ReservationVO">
+		select occurrence_type from reservation where
+		reservation_id = #{reservation_id,jdbcType=NUMERIC}
+	</select>
+
+	<select id="returnOneTimeReservationDetails"
+		parameterType="com.path.dbmaps.vo.ReservationVO"
+		resultType="com.path.dbmaps.vo.ReservationListVO">
+		select * from reservation_list where reservation_id =
+		#{reservation_id,jdbcType=NUMERIC}
+	</select>
+
+	<select id="returnRecurringReservationDetails"
+		parameterType="com.path.dbmaps.vo.ReservationVO"
+		resultType="com.path.dbmaps.vo.ReservationCO">
+		select * from reservation_list l , recurring_template t ,
+		reservation re
+		where t.reservation_id =
+		#{reservation_id,jdbcType=NUMERIC}
+		and
+		t.reservation_id
+		=l.reservation_id
+		and t.reservation_id = re.reservation_id
+	</select>
+
+	<select id="returnIfMachineDriverIsReserved"
+		parameterType="com.path.dbmaps.vo.MachineDriverSC"
+		resultType="com.path.dbmaps.vo.ReservationListVO">
+		select reservation_list_id, reservation_id,machine_driver_id,date,
+		time,reservation_list_status, subtime(time_slot,time) as time_slot from
+		reservation_list where machine_driver_id
+
+		=(select
+		machine_driver_id from
+		machine_driver where
+		<if test="machine_id != 0">
+			machine_id
+			= #{machine_id,jdbcType=NUMERIC}
+		</if>
+		<if test="driver_id != 0">
+			driver_id = #{driver_id,jdbcType=NUMERIC}
+		</if>
+		)
+		and date= #{date,jdbcType=TIMESTAMP}
+		and time >
+		#{time,jdbcType=TIMESTAMP}
+	</select>
+
+	<select id="returnReservationDetails"
+		parameterType="com.path.dbmaps.vo.ReservationListVO"
+		resultType="com.path.dbmaps.vo.ReservationCO">
+		select r.* , rl.* from reservation r, reservation_list rl where r.reservation_id =
+		#{reservation_id,jdbcType=NUMERIC} and r.reservation_id = rl.reservation_id
+	</select>
+
+	<select id="returnStore"
+		parameterType="com.path.dbmaps.vo.StoreVO"
+		resultType="com.path.dbmaps.vo.StoreVO">
+		select * from store where name =
+		#{name,jdbcType=VARCHAR} and 
+		address = #{address,jdbcType=VARCHAR} and
+		mobile_number = #{mobile_number,jdbcType=VARCHAR}
+	</select>
+	
+	
+	<select id="returnListOfDestination"
+		parameterType="com.path.dbmaps.vo.List_destinationsVO"
+		resultType="com.path.dbmaps.vo.List_destinationsVO">
+		select * from list_destinations where client_id = #{client_id,jdbcType=NUMERIC}
+	</select>
+	
+	<select id="returnLast3Reservations"
+		parameterType="com.path.dbmaps.vo.ReservationCO"
+		resultType="com.path.dbmaps.vo.ReservationCO">
+		select rl.reservation_list_status  , rl.reservation_list_id
+		from reservation_list rl , reservation r  where r.client_id = #{client_id,jdbcType=NUMERIC}
+		and r.reservation_id = rl.reservation_id
+		order by reservation_list_id desc
+		limit #{counter,jdbcType=NUMERIC}
+	</select>
+	
+	<select id="returnMobileNumber"
+		parameterType="com.path.dbmaps.vo.ClientVO"
+		resultType="com.path.dbmaps.vo.ClientVO">
+		SELECT mobile_number FROM client WHERE 
+		username= #{username,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="returnListDevices"
+		parameterType="com.path.dbmaps.vo.ClientVO"
+		resultType="com.path.dbmaps.vo.ClientCO">
+		SELECT d.device_UUID , d.device_name ,cd.last_login  from device d , client_device cd
+		WHERE cd.client_id = #{client_id,jdbcType=VARCHAR} 
+		and d.device_id = cd.device_id
+	</select>
+	
+	<select id="returnLanguageError"
+		parameterType="com.path.dbmaps.vo.ErrorVO"
+		resultType="com.path.dbmaps.vo.ErrorVO">
+		SELECT l.* , r.* FROM language l , error r 
+		WHERE l.language_id = r.language_id
+	</select>
+	
+	<select id="returnGender"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.ClientCO">
+		SELECT gender FROM client WHERE username = #{username,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="returnLastLogin"
+		parameterType="com.path.dbmaps.vo.ClientCO"
+		resultType="com.path.dbmaps.vo.ClientCO">
+		SELECT last_login_user FROM client WHERE client_id = #{client_id,jdbcType=NUMERIC}
+	</select>
+	
+	
+</mapper>
